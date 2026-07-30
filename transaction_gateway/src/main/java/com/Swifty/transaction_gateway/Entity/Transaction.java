@@ -2,6 +2,7 @@ package com.Swifty.transaction_gateway.Entity;
 
 import com.Swifty.transaction_gateway.enums.TransactionStatus;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Builder
 @Data
+@AllArgsConstructor
 @Table(name = "transactions")
 public class Transaction {
     @Id

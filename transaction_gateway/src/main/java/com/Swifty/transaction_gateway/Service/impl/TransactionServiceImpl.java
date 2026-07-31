@@ -1,12 +1,16 @@
 package com.Swifty.transaction_gateway.Service.impl;
 
 import com.Swifty.transaction_gateway.Entity.Transaction;
+import com.Swifty.transaction_gateway.Exceptions.DuplicateTransactionException;
 import com.Swifty.transaction_gateway.Exceptions.ResourceNotFoundException;
 import com.Swifty.transaction_gateway.Repository.TransactionRepository;
+import com.Swifty.transaction_gateway.Service.RedisService;
 import com.Swifty.transaction_gateway.Service.TransactionService;
 import com.Swifty.transaction_gateway.dto.PaymentRequest;
 import com.Swifty.transaction_gateway.dto.PaymentResponse;
 import com.Swifty.transaction_gateway.enums.TransactionStatus;
+import com.Swifty.transaction_gateway.event.PaymentInitiatedEvent;
+import com.Swifty.transaction_gateway.producer.PaymentProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,13 +21,23 @@ import java.util.UUID;
 public class TransactionServiceImpl implements TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final RedisService redisService;
+    private final PaymentProducer paymentProducer;
+
 
     @Override
-    public PaymentResponse createTransaction(PaymentRequest request) {
+    public PaymentResponse createTransaction(
+            String idempotencyKey,
+            PaymentRequest request) {
 
-        // Create Transaction Entity
+        if (redisService.hasKey(idempotencyKey)) {
+            throw new DuplicateTransactionException(
+                    "Duplicate payment request detected.");
+        }
+
+        // Existing logic to create and save the transaction
         Transaction transaction = Transaction.builder()
-                .transactionId(generateTransactionId())
+                .transactionId(UUID.randomUUID().toString())
                 .senderId(request.getSenderId())
                 .receiverId(request.getReceiverId())
                 .amount(request.getAmount())
@@ -31,10 +45,28 @@ public class TransactionServiceImpl implements TransactionService {
                 .status(TransactionStatus.PENDING)
                 .build();
 
-        // Save to Database
         Transaction savedTransaction = transactionRepository.save(transaction);
 
-        // Convert Entity to Response DTO
+
+        // Create Event
+
+        PaymentInitiatedEvent event =
+                PaymentInitiatedEvent.builder()
+                        .transactionId(savedTransaction.getTransactionId())
+                        .senderId(savedTransaction.getSenderId())
+                        .receiverId(savedTransaction.getReceiverId())
+                        .amount(savedTransaction.getAmount())
+                        .currency(savedTransaction.getCurrency())
+                        .build();
+
+        // Publish to Kafka
+        paymentProducer.publishPaymentInitiatedEvent(event);
+
+
+
+        // Save the idempotency key in Redis
+        redisService.saveKey(idempotencyKey);
+
         return PaymentResponse.builder()
                 .transactionId(savedTransaction.getTransactionId())
                 .senderId(savedTransaction.getSenderId())

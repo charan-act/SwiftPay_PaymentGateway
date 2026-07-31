@@ -31,9 +31,11 @@ public class TransactionController {
 
     @PostMapping
     public ResponseEntity<PaymentResponse> createTransaction(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody PaymentRequest request) {
-       log.info("TransactionController.createTransaction {}",request);
-        PaymentResponse response = transactionService.createTransaction(request);
+
+        PaymentResponse response =
+                transactionService.createTransaction(idempotencyKey, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

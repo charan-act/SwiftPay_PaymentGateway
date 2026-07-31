@@ -1,6 +1,7 @@
 package com.Swifty.transaction_gateway.Service.impl;
 
 import com.Swifty.transaction_gateway.Entity.Transaction;
+import com.Swifty.transaction_gateway.Exceptions.ResourceNotFoundException;
 import com.Swifty.transaction_gateway.Repository.TransactionRepository;
 import com.Swifty.transaction_gateway.Service.TransactionService;
 import com.Swifty.transaction_gateway.dto.PaymentRequest;
@@ -46,6 +47,29 @@ public class TransactionServiceImpl implements TransactionService {
                 .build();
     }
 
+
+
+
+    @Override
+    public PaymentResponse getTransactionByTransactionId(String transactionId) {
+
+        Transaction transaction = transactionRepository
+                .findByTransactionId(transactionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Transaction not found with ID : " + transactionId));
+
+        return PaymentResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .senderId(transaction.getSenderId())
+                .receiverId(transaction.getReceiverId())
+                .amount(transaction.getAmount())
+                .currency(transaction.getCurrency())
+                .status(transaction.getStatus())
+                .createdAt(transaction.getCreatedAt())
+                .message("Transaction fetched successfully")
+                .build();
+    }
     /**
      * Generates a unique transaction ID.
      */
